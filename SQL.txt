@@ -1,0 +1,20 @@
+To Create database:
+	create database resumes;
+
+To Create Table:
+	use resumes;
+	create table employees(
+		Name varchar(50),
+		Email varchar(50),
+		Resume mediumblob,
+		score float,
+		location varchar(30),
+		category varchar(50)
+	);
+
+To store in Table:
+	query = """INSERT INTO employees (Name,Email,Resume,score,location,category) value (%s,%s,%s,%s,%s,%s)"""
+    	value = (name, email, resume_content, score, location, category)
+
+If table already exists without category column:
+	ALTER TABLE employees ADD COLUMN category VARCHAR(50);
