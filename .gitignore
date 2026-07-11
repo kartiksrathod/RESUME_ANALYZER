@@ -3,4 +3,6 @@ __pycache__/
 *.pyc
 *.joblib
 *.pkl
+*.zip
 .env
+*.csv

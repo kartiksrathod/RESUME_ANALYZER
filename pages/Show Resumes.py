@@ -1,40 +1,62 @@
 import streamlit as st
-import mysql.connector
+from db_config import get_db_connection
+
 st.set_page_config(page_title="Show Resumes")
-mydb = mysql.connector.connect(user='root', password='Sheshi@1234',
-                                                host='127.0.0.1', database='resumes',
-                                                auth_plugin='mysql_native_password')
+
+mydb = get_db_connection()
 cur = mydb.cursor()
 query0 = """SELECT POSITION FROM HR"""
 cur.execute(query0)
-positin1 = cur.fetchall()
+row = cur.fetchone()
 
+if not row or not row[0]:
+    st.warning("No HR position is set. Please add a position via HR.py first.")
+    st.stop()
 
-mydb.commit()
-position1 = list(positin1[0])
-category=position1[0].lower()
-query1 = f"""SELECT Name,Email,location,score,Resume,category FROM employees WHERE category = '{category}' ORDER BY score DESC"""
+category = row[0].lower()
+cur.execute("SHOW COLUMNS FROM employees")
+employee_columns = {column[0].lower() for column in cur.fetchall()}
+
+if 'match_percentage' in employee_columns:
+    match_column = 'match_percentage'
+elif 'score' in employee_columns:
+    match_column = 'score'
+else:
+    st.error("No match score column found in the employees table. Please run fix_database.py to update the schema.")
+    st.stop()
+
+missing_skills_expression = 'missing_skills' if 'missing_skills' in employee_columns else "'' AS missing_skills"
+
+query1 = f"SELECT Name,Email,location,{match_column} AS match_percentage,Resume,category,{missing_skills_expression} FROM employees ORDER BY {match_column} DESC"
 cur.execute(query1)
 resumes = cur.fetchall()
 
-colms = st.columns((1, 2, 3, 1))
-fields = ["Name", 'Email', 'Location', "Resume"]
-for col, field_name in zip(colms, fields):
-    # header
-    col.write(field_name)
-c=0
-for row in resumes:
-    col1, col2, col3, col4, col5 = st.columns((1, 2, 2,1, 1))
-    col1.write(row[0])  #name
-    col2.write(row[1])  # email
-    col3.write(row[2])  # location
-    # col4.write(row[3])   # score
-    disable_status = "X"  # flexible type of button
-    # button_type = "Show" if disable_status else "Seen"
-    button_phold = col5.empty()  # create a placeholder
-    # do_action = button_phold.button(button_type, key=c)
-    do_action = button_phold.button("Show", key=c, type="primary")
-    if do_action:
-        button_phold.button("Hide", key=str(c)+'_', type="primary")
-        st.text(row[4])
-    c+=1
+st.title("Shortlisted Resumes")
+st.subheader("All Candidates (Sorted by Match Score)")
+
+if not resumes:
+    st.info("No resumes found yet.")
+    st.stop()
+
+for idx, (name, email, location, match_percentage, resume_text, category_name, missing_skills) in enumerate(resumes):
+    if isinstance(resume_text, (bytes, bytearray)):
+        resume_text = resume_text.decode('utf-8', errors='ignore')
+    if category_name is None:
+        category_name = 'Uncategorized'
+    if missing_skills is None:
+        missing_skills = 'None identified'
+
+    with st.expander(f"{name} — {email} — Match: {match_percentage:.1f}% — {category_name}", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Location:**", location)
+            st.write("**Match Score:**", f"{match_percentage:.1f}%")
+        with col2:
+            st.write("**Category:**", category_name)
+            if missing_skills and missing_skills != 'None identified':
+                st.write("**Missing Skills:**", missing_skills)
+            else:
+                st.write("**Missing Skills:** None identified")
+        
+        st.markdown("**Resume:**")
+        st.write(resume_text)
